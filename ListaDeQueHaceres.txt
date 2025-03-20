@@ -1,0 +1,29 @@
+Laravel - MySql - Angular
+
+cuarto(room) -> 911
+Empleados -> numero de identificación
+Modulo de accesos -> room 911
+Modulo se protege con usuario y contraseña -> rol: admin_room_911
+Registrar un empleado con datos básicos -> room 911
+Empleado -> departamento de producción
+Cargar n número empleados a un departamento por medio de Excel
+Editar info empleado -> incluir si puede o no entrar al room 911
+Tener un log de acceso -> donde se indique si pudo ingresar al sistema, y si cuenta con un usuario para ingresar -> id del empleado, nombre del empleado, fecha y hora
+Busquedas por id, nombre o apellido del empleado, filtrar por departamento
+Al consultar un empleado -> se debe mostrar el historial de intentos de acceso, filtrar datos por rango de fecha
+Se debe poder generar un documento en pdf con los registros de intentos de ingreso seleccionados
+
+-----------------------------------------------------------------------------------------------
+
+base de datos
+tabla de usuarios
+tabla de empleados
+tabla de roles -> admin_room_911
+tabla de departamentos
+
+-----------------------------------------------------------------------------------------------
+
+Ya se valida si el usuario existe
+inicio de sesión y cerrar sesión
+Mostrar empleados
+
