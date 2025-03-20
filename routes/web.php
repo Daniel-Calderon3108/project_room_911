@@ -3,7 +3,6 @@
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\HistoryAccessController;
 use App\Http\Controllers\UserController;
-use App\Models\Employee;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -23,9 +22,9 @@ Route::get('/', [UserController::class, 'index'])->name('login');
 // Route to the login action
 Route::post('/login', [UserController::class, 'login']);
 // Route to the logout action
-Route::post('/logout', [UserController::class, 'logout']);
+Route::post('/logout', [UserController::class, 'logout'])->middleware('auth');
 // Enable / Disable User
-Route::put('/changeActive/{idUser}', [UserController::class, 'enableOrDisable']);
+Route::put('/changeActive/{idUser}', [UserController::class, 'enableOrDisable'])->middleware('auth');
 
 /* ------------------------------Employee Routes -----------------------------  */
 // Route to the main panel
