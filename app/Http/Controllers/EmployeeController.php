@@ -288,6 +288,8 @@ class EmployeeController extends Controller
 
     /**
      * Update the specified resource in storage.
+     * @param Request $request
+     * @return array{success: bool, message: string, data: Employee|null}
      */
     public function update(Request $request)
     {
@@ -412,10 +414,9 @@ class EmployeeController extends Controller
     private function getHistoryAccess(Employee $employee)
     {
         // Get All History Access
-        $histories = HistoryAccess::select('employee_id')
-            ->where('employee_id', $employee->id)->get();
-        // Count Access
-        $count = count($histories);
+        $count = HistoryAccess::select('employee_id')
+            ->where('employee_id', $employee->id)->count();
+        
         // Update Count Access
         $employee->count_access = $count;
         return $employee;

@@ -42,7 +42,7 @@ class UserController extends Controller
             // Check if the user exists
             if (!$user) return $this->createHistoryAccess(null, null, false, 'User not found');
 
-            $id = $user->id; // Get the user id
+            $id = $user->employee->id; // Get the employee id
             $name_complete = $user->employee->name . ' ' . $user->employee->last_name; // Get the complete name
 
             // Check if the user is active

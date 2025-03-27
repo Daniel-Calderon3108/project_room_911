@@ -4,7 +4,7 @@
 @section('title_header', 'ROOM 911 Authentication')
 @section('content')
     <section class="form_login">
-        <form action="/login" method="POST" class="login">
+        <form action="{{ route('login.action') }}" method="POST" class="login">
             @csrf
             <figure>
                 <img src="{{ asset('assets/user.png') }}" alt="">

@@ -9,7 +9,7 @@
     </section>
     <section class="info_user">
         <p id="current-time"></p>
-        <form action="/logout" method="POST">
+        <form action="{{ route('logout') }}" method="POST">
             @csrf
             <button class="close_session">Close session</button>
         </form>
@@ -45,7 +45,7 @@
         </form>
     </section>
     <section class="new">
-        <form action="{{  route('export_employees') }}" method="GET">
+        <form action="{{  route('employee.export_employees') }}" method="GET">
             @csrf
             <input type="text" name="employee" id="employee_export" value="" hidden>
             <input type="text" name="department" id="department_export" value="" hidden>
