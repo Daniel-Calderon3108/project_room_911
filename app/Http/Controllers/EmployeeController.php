@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\formEmployee;
 use App\Models\Department;
-use App\Models\HistoryAccess;
+use App\Models\Role;
 use App\Models\User;
 use App\Traits\ApiResponse;
+use ArgumentCountError;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -15,13 +17,12 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 
+define('TABLE_EMPLOYEES', 'employees');
+define('TABLE_HISTORY_ACCESS', 'history_accesses');
+
 class EmployeeController extends Controller
 {
     use ApiResponse;
-
-    private $tableEmployees = 'employees';
-    private $tableDepartments = 'departments';
-    private $tableHistoryAccess = 'history_accesses';
 
     /**
      * Display a listing of the resource.
@@ -30,17 +31,14 @@ class EmployeeController extends Controller
     public function index()
     {
         // Get All Employees
-        $employees = Employee::paginate(10);
-
-        // Count Access one employee
-        // Foreach Employee
-        foreach ($employees as $employee) {
-            $employee = $this->getHistoryAccess($employee);
-        }
+        $employees = Employee::withCount('historyAccess')->paginate(10);
 
         // Get All Departments
         $departments = Department::all();
-        return view('main-panel', compact('departments', 'employees'));
+        // Get All Roles
+        $roles = Role::all();
+
+        return view('main-panel', compact('departments', 'employees', 'roles'));
     }
 
     /**
@@ -48,25 +46,26 @@ class EmployeeController extends Controller
      * @param Request $request
      * @return array{success: bool, message: string, data: Employee|null}
      */
-    public function store(Request $request)
+    public function store(formEmployee $request)
     {
         try {
             // Validate Request
-            $validated = $this->validatorRequest($request)->validate();
+            $validated = $request->validated();
 
             // Create User
-            $user = new User();
-            $user->name = $validated['user'];
-            $user->password = bcrypt($validated['password']);
-            $user->save();
+            $user = User::create([
+                'name' => $validated['user'],
+                'password' => bcrypt($validated['password']),
+                'role_id' => $request['role_id'] == 0 ? null : $request['role_id']
+            ]);
 
             // Create Employee
-            $employee = new Employee();
-            $employee->name = $validated['name'];
-            $employee->last_name = $validated['last_name'];
-            $employee->department_id = $validated['department_id'];
-            $employee->user_id = $user->id;
-            $employee->save();
+            $employee = Employee::create([
+                'name' => $validated['name'],
+                'last_name' => $validated['last_name'],
+                'department_id' => $validated['department_id'],
+                'user_id' => $user->id,
+            ]);
 
             // Return Employee
             return $this->response(true, "Employee created successfully", 201, $employee);
@@ -91,9 +90,7 @@ class EmployeeController extends Controller
             ]);
 
             // Open File
-            if (!$file = fopen($request->file('import'), 'r')) {
-                return $this->response(false, "Error opening file", 500);
-            }
+            if (!$file = fopen($request->file('import'), 'r')) return $this->response(false, "Error opening file", 500);
 
             // Open file like raw text to detect the delimiter
             $rawLine = fgets($file);
@@ -106,8 +103,7 @@ class EmployeeController extends Controller
 
             // Read and clean the Header
             $header = array_map(function ($item) {
-                // Remove BOM
-                return strtolower(trim(preg_replace('/\x{FEFF}/u', '', $item)));
+                return strtolower(trim(preg_replace('/\x{FEFF}/u', '', $item))); // Remove BOM
             }, fgetcsv($file, 0, $delimiter));
 
             $headerRequired = ['user', 'password', 'name', 'last_name', 'department', 'active'];
@@ -155,12 +151,15 @@ class EmployeeController extends Controller
                 // Get or create department
                 $department = $this->getOrCreateDepartment($validated['department']);
 
+                $role = Role::where('name', 'role_admin_room_911')->first(); // Get Role
+
                 // Create or update user
                 $user = User::updateOrCreate(
                     ['name' => $validated['user']],
                     [
                         'password' => bcrypt($validated['password']),
-                        'active' => $validated['active']
+                        'active' => $validated['active'],
+                        'role_id' => $role->id // Assign role
                     ]
                 );
 
@@ -196,9 +195,8 @@ class EmployeeController extends Controller
     {
         try {
             // Find Employee
-            $employee = Employee::find($idEmployee);
-            // Charge User
-            $employee->user;
+            $employee = Employee::with('user')->find($idEmployee);
+
             // Return Employee
             return $this->response(true, "Employee information obtained successfully", 200, $employee);
         } catch (\Exception $e) {
@@ -220,10 +218,11 @@ class EmployeeController extends Controller
         try {
             // Create Query
             $query = Employee::query()
-                ->select($this->tableEmployees . '.*')
-                ->leftjoin($this->tableHistoryAccess, 'employees.id', '=', $this->tableHistoryAccess . '.employee_id')
-                ->distinct($this->tableEmployees .  '.id')
-                ->with('department');
+                ->select(TABLE_EMPLOYEES . '.*')
+                ->leftjoin(TABLE_HISTORY_ACCESS, 'employees.id', '=', TABLE_HISTORY_ACCESS . '.employee_id')
+                ->distinct(TABLE_EMPLOYEES .  '.id')
+                ->with('department')
+                ->withCount('historyAccess'); // Count Access
 
             // Get Parameters
             $employee    = $request->filled('employee') ? $request->employee : null;
@@ -234,41 +233,29 @@ class EmployeeController extends Controller
             // Validate Parameters
             if ($employee) {
                 if (is_numeric($employee)) {
-                    $query->where($this->tableEmployees . '.id', $employee);
+                    $query->where(TABLE_EMPLOYEES . '.id', $employee);
                 } else {
-                    $query->where('name', 'like', '%' . $employee . '%')
-                        ->orWhere('last_name', 'like', '%' . $employee . '%');
+                    $query->where(function ($query) use ($employee) {
+                        $query->where('name', 'like', '%' . $employee . '%')
+                              ->orWhere('last_name', 'like', '%' . $employee . '%');
+                    });
                 }
             }
 
-            if ($department) {
-                $query->where('department_id', $department);
-            }
+            if ($department) $query->where('department_id', $department);
 
             if ($initial && $final) {
                 // Add start and end times to the dates
                 $initial = $initial . ' 00:00:00';
                 $final = $final . ' 23:59:59';
-                $query->whereBetween($this->tableHistoryAccess . '.created_at', [$initial, $final]);
+                $query->whereBetween(TABLE_HISTORY_ACCESS . '.created_at', [$initial, $final]);
             } else if ($initial) {
-                $query->where($this->tableHistoryAccess . '.created_at', '>=', $initial);
+                $query->where(TABLE_HISTORY_ACCESS . '.created_at', '>=', $initial);
             } else if ($final) {
-                $query->where($this->tableHistoryAccess . '.created_at', '<=', $final);
+                $query->where(TABLE_HISTORY_ACCESS . '.created_at', '<=', $final);
             }
 
-            // Get Employees
-            if ($export) { // Export to PDF
-                $employees = $query->get();
-                
-            } else { // Paginate
-                $employees = $query->paginate(10);
-            }
-            
-            // Count Access one employee
-            // Foreach Employee
-            foreach ($employees as $employee) {
-                $employee = $this->getHistoryAccess($employee);
-            }
+            $employees = $export ? $query->get() : $query->paginate(10); // Get Employees
 
             if ($export) {
                 // Set Date
@@ -291,12 +278,12 @@ class EmployeeController extends Controller
      * @param Request $request
      * @return array{success: bool, message: string, data: Employee|null}
      */
-    public function update(Request $request)
+    public function update(formEmployee $request)
     {
-
+        $user = null;
         try {
             // Validate Request
-            $validated = $this->validatorRequest($request, true)->validate();
+            $validated = $request->validated();
 
             // Find Employee
             $employee = Employee::find($request->employee_id);
@@ -308,7 +295,7 @@ class EmployeeController extends Controller
             if ($request->password) {
                 $user->password = bcrypt($validated['password']);
             }
-            $user->active = $request->active;
+            $user->role_id = $request['role_id'] == 0 ? null : $request['role_id'];
             $user->save();
 
             // Update Employee
@@ -322,7 +309,7 @@ class EmployeeController extends Controller
         } catch (ValidationException $e) {
             return $this->response(false, "Error validate data employee: " . $e->getMessage(), 422);
         } catch (\Exception $e) {
-            return $this->response(false, "Error updating employee: " . $e->getMessage(), 500);
+            return $this->response(false, "Error updating employee: " . $e->getMessage(), 500, $user);
         }
     }
 
@@ -352,74 +339,21 @@ class EmployeeController extends Controller
     }
 
     /**
-     * Validate the request
-     * @param Request $request
-     * @param bool $update
-     * @return ValidatorContract
-     */
-    private function validatorRequest(Request $request, bool $update = false)
-    {
-        // Search for a user with the same name
-        $userId = $update ? User::where('name', $request->user)->value('id') : null;
-
-        return Validator::make($request->all(), [
-            'name' => ['required', 'string', 'min:3', 'max:100', 'regex:/^[a-zA-Z\s]+$/'],
-            'last_name' => ['required', 'string', 'min:5', 'max:100', 'regex:/^[a-zA-Z\s]+$/'],
-            'department_id' => ['required', 'integer', 'exists:departments,id'],
-            'user' => [
-                'required',
-                'string',
-                'min:5',
-                'max:100',
-                'regex:/^[a-zA-Z0-9]+$/',
-                $update ? 'unique:users,name,' . $userId : 'unique:users,name' // Unique User
-            ],
-            'password' => [
-                $update ? 'required_if:password,!=,null' : 'required', // Required if update is true
-                'string',
-                'min:8',
-                'regex:/[a-z]/', // At least one lowercase letter
-                'regex:/[A-Z]/', // At least one uppercase letter
-                'regex:/[0-9]/', // At least one number
-                'regex:/[@$!%*#?&]/' // At least one special character
-            ],
-        ]);
-    }
-
-    /**
      * Validate form request
      * @param Request $request
      * @return JsonResponse
      */
-    public function validatorForm(Request $request)
+    public function validatorForm(formEmployee $request)
     {
-        // Get Update Value from Request (0 or 1)
-        $update = $request->input('update') == 1;
-
-        // Validate Request
-        $validator = $this->validatorRequest($request, $update);
-
-        // Validate Form
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors(), "update" => $update], 422); // Return Errors
+        try {
+            // Validate Request
+            $request->validate();
+            return response()->json(['message' => 'Valid!'], 200); // Return Valid
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422); // Return Errors
+        } catch (ArgumentCountError $e) {
+            return response()->json(['message' => 'Valid!'], 200); // Return Valid
         }
-        return response()->json(['message' => 'Valid!'], 200); // Return Success
-    }
-
-    /**
-     * Get History Access by Employee Id
-     * @param Employee $employee
-     * @return Employee
-     */
-    private function getHistoryAccess(Employee $employee)
-    {
-        // Get All History Access
-        $count = HistoryAccess::select('employee_id')
-            ->where('employee_id', $employee->id)->count();
-        
-        // Update Count Access
-        $employee->count_access = $count;
-        return $employee;
     }
 
     /**

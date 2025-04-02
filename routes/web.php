@@ -26,19 +26,24 @@ Route::post('/logout', [UserController::class, 'logout'])->middleware('auth')->n
 // Enable / Disable User
 Route::put('/changeActive/{idUser}', [UserController::class, 'enableOrDisable'])->middleware('auth')->name('user.changeActive');
 
-/* ------------------------------Employee Routes -----------------------------  */
-// Route to the main panel
+
+/*------------------------------Main Panel Routes ----------------------------   */
+
+// Main panel
 Route::get('/home', [EmployeeController::class, 'index'])->middleware('auth')->name('home');
+
+/* ------------------------------Employee Routes -----------------------------  */
+
 // Route show employee by id
 Route::get('/get_employee/{id}', [EmployeeController::class, 'show'])->middleware('auth')->name('employee.show');
 // Validate the form employee
-Route::post('/validate_form', [EmployeeController::class, 'validatorForm'])->middleware('auth')->name('employee.validate_form');
+Route::post('/validate_form/{id}', [EmployeeController::class, 'validatorForm'])->middleware('auth')->name('employee.validate_form');
 // Store employees for csv file
 Route::post('/store_employees', [EmployeeController::class, 'storeEmployees'])->middleware('auth')->name('employee.store_employees');
 // Store the employee
 Route::post('/store_employee', [EmployeeController::class, 'store'])->middleware('auth')->name('employee.store');
 // Update the employee
-Route::put('/update_employee', [EmployeeController::class, 'update'])->middleware('auth')->name('employee.update');
+Route::put('/update_employee/{id}', [EmployeeController::class, 'update'])->middleware('auth')->name('employee.update');
 // Delete the employee
 Route::delete('/delete_employee/{idEmployee}/{idUser}', [EmployeeController::class, 'destroy'])->middleware('auth')->name('employee.delete');
 // Show a list of employees according to established parameters.

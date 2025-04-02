@@ -37,7 +37,7 @@ class UserController extends Controller
             ]);
 
             // Search the user
-            $user = User::where('name', $validated['name'])->first();
+            $user = User::with('role')->where('name', $validated['name'])->first();
 
             // Check if the user exists
             if (!$user) return $this->createHistoryAccess(null, null, false, 'User not found');
@@ -45,8 +45,12 @@ class UserController extends Controller
             $id = $user->employee->id; // Get the employee id
             $name_complete = $user->employee->name . ' ' . $user->employee->last_name; // Get the complete name
 
-            // Check if the user is active
-            if (!$user->active) return $this->createHistoryAccess($id, $name_complete, false, 'User not permitted');
+            // Check if the user has a role and if the role is 'role_admin_room_911'
+            if ($user->role_id == null) {
+                return $this->createHistoryAccess($id, $name_complete, false, 'User not permitted');
+            } elseif ($user->role->name != 'role_admin_room_911') {
+                return $this->createHistoryAccess($id, $name_complete, false, 'User not permitted');
+            }
 
             if (Auth::attempt($validated)) {
                 $request->session()->regenerate();

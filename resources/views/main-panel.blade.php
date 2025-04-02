@@ -75,11 +75,11 @@
                         <td>{{ $employee->name }}</td>
                         <td>{{ $employee->last_name }}</td>
                         <td>{{ $employee->department->name }}</td>
-                        <td>{{ $employee->count_access }}</td>
+                        <td>{{ $employee->history_access_count }}</td>
                         <td class="btns">
                             <button class="btn update" onclick="setFormEmployee(true, {{ $employee->id }})">Update</button>
                             <button class="btn disable" onclick="toggleEmployeeStatus('{{$employee->user->id}}')" id="status-{{$employee->user->id}}">
-                                {{ $employee->user->active ? "Enable" : "Disable" }}
+                                {{ $employee->user->active ? "Disable" : "Enable" }}
                             </button>
                             <button class="btn history" onclick="getHistoryEmployee({{ $employee->id }})">History</button>
                             <button class="btn delete" onclick="deleteEmployee({{ $employee->id }}, {{ $employee->user->id }})">Delete</button>
@@ -134,10 +134,12 @@
                     </div>
                     <span class="error_form hidden" id="error-password"></span>
                 </div>
-                <div class="item hidden" id="active_form">
-                    <select name="active" id="active">
-                        <option value="1">Enable</option>
-                        <option value="0">Disable</option>
+                <div class="item">
+                    <select name="role_id" id="role_id">
+                        <option value="0">Select role</option>
+                        @foreach ($roles as $role)
+                            <option value="{{ $role->id }}">{{ $role->name }}</option>
+                        @endforeach
                     </select>
                 </div>
                 <button id="submit" disabled>Save</button>

@@ -3,14 +3,14 @@ window.onload = function () {
     currentTime();
 
     let debounceTimer;
-
-    // Add class touched to input when it is touched
-    $('#form-employee-data input').on('keyup', function () {
-        $(this).addClass('touched');
-    });
+    let countInput = 0;
 
     // Validate input if it has been touched
-    $('#form-employee-data input').on('input', function () {
+    $('#form-employee-data input').on('keyup', function () {
+        // It increases to 2, not to count when the user field and password are self -reflected by the browser
+        if (countInput < 2) return countInput++;
+
+        $(this).addClass('touched');
 
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(function () {
@@ -20,38 +20,39 @@ window.onload = function () {
     })
 
     // When the form is submitted with filter
-    $('#form-filter').on('submit', function(e) {
+    $('#form-filter').on('submit', function (e) {
         e.preventDefault();
         filterEmployees();
     });
 
     // Delegated event for pagination buttons
-    $(document).on('click', '.page-link', function() {
+    $(document).on('click', '.page-link', function () {
         let url = $(this).data('url');
         filterEmployees(url);
     })
 }
 
 // Modals to show
-let modal = [
+const modal = [
     'form-employee',
     'history-employee',
     'modal-wait-import'
 ];
 
 // Animation wait import
-let animation = [
+const animation = [
     'hourglass-start',
     'hourglass-half',
     'hourglass-end',
 ]
 
-let interval;
+let interval; // Interval for animation
 
-let update = 0;
-let showPassword = false;
-let typePassword = 'password';
-let imagePassword = 'eye-slash';
+let update = 0; // Variable to check if it is an update or not
+let showPassword = false; // Variable to check if the password is shown or not
+let typePassword = 'password'; // Variable to check the type of password
+let imagePassword = 'eye-slash'; // Variable to check the image of the password
+let idEmployee = null; // Variable to check the id of the employee
 
 // Get the current time
 function currentTime(fechaStr = null) {
@@ -68,21 +69,21 @@ function currentTime(fechaStr = null) {
     minutes = minutes < 10 ? '0' + minutes : minutes; // Minutes must be between 00-59
     seconds = seconds < 10 ? '0' + seconds : seconds; // Seconds must be between 00-59
     var strTime = day + '-' + month + '-' + year + " " + hours + ':' + minutes + ':' + seconds + ' ' + ampm; // Display the time
-    if (fechaStr) {
-        return strTime;
-    } else {
-        document.getElementById('current-time').innerHTML = strTime; // Display the time
-        setTimeout(currentTime, 1000); // Update the time every second 
-    }
+
+    if (fechaStr) return strTime;
+
+    document.getElementById('current-time').innerHTML = strTime; // Display the time
+    setTimeout(currentTime, 1000); // Update the time every second 
 }
 
 // Set Form Employee
 function setFormEmployee(edit, employeeId = null) {
     $('.error_form').text(''); // Clear all errors
-    $('.error_form').addClass('hidden');
-    $('#submit').prop('disabled', true);
-
+    $('.error_form').addClass('hidden'); // Hide all errors
+    $('#form-employee-data input').removeClass("touched"); // Remove touched class from all inputs
+    $('#submit').prop('disabled', true); // Disable submit button
     document.getElementById('password').value = '';
+
     if (edit) {
 
         $.ajax({
@@ -90,6 +91,8 @@ function setFormEmployee(edit, employeeId = null) {
             method: 'GET',
             success: function (response) {
                 if (response.success) {
+                    let role = response.data.user.role_id ? response.data.user.role_id : 0;
+
                     document.getElementById('form-employee-title').innerHTML = 'Edit Employee';
                     document.getElementById('employee_id').value = response.data.id;
                     document.getElementById('user_id').value = response.data.user_id;
@@ -97,10 +100,10 @@ function setFormEmployee(edit, employeeId = null) {
                     document.getElementById('last_name').value = response.data.last_name;
                     document.getElementById('department_id').value = response.data.department_id;
                     document.getElementById('user').value = response.data.user.name;
-                    document.getElementById('active').value = response.data.user.active;
-                    document.getElementById('active_form').classList.remove('hidden');
+                    document.getElementById('role_id').value = role;
                     document.getElementById('form-import').classList.add('hidden');
                     update = 1;
+                    idEmployee = employeeId;
                     showModal('form-employee');
                 } else {
                     console.error(response.message);
@@ -120,8 +123,7 @@ function setFormEmployee(edit, employeeId = null) {
         document.getElementById('last_name').value = '';
         document.getElementById('department_id').value = '1';
         document.getElementById('user').value = '';
-        document.getElementById('active').value = '1';
-        document.getElementById('active_form').classList.add('hidden');
+        document.getElementById('role_id').value = '0';
         document.getElementById('form-import').classList.remove('hidden');
         update = 0;
         showModal('form-employee');
@@ -130,6 +132,7 @@ function setFormEmployee(edit, employeeId = null) {
 
 // Show modals
 function showModal(modalId) {
+    $('body').css('overflow', 'hidden'); // Disable scroll
     if (document.getElementById('modals').classList.contains('hidden')) {
         document.getElementById('modals').classList.remove('hidden');
     }
@@ -145,6 +148,7 @@ function showModal(modalId) {
 
 // Hide modals
 function hideModal() {
+    $('body').css('overflow', ''); // Enable scroll
     document.getElementById('modals').classList.add('hidden');
     modal.forEach(function (item) {
         document.getElementById(item).classList.add('hidden');
@@ -154,19 +158,13 @@ function hideModal() {
 // Enable / Disable Employee
 function toggleEmployeeStatus(userId) {
 
-    $.ajaxSetup({
-        headers: {
-            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-        }
-    });
-
     $.ajax({
         url: `changeActive/${userId}`,
         dataType: 'JSON',
         method: 'PUT',
         success: function (response) {
             if (response.success) {
-                let newStatus = response.data ? 'Enable' : 'Disable';
+                let newStatus = response.data ? 'Disable' : 'Enable';
                 document.getElementById('status-' + userId).innerHTML = newStatus;
             } else {
                 console.error(response.message);
@@ -208,7 +206,6 @@ function getHistoryEmployee(employeeId) {
         },
         error: function (xhr) {
             console.error(xhr)
-            showModal('history-employee');
         }
     });
 }
@@ -224,8 +221,6 @@ function showHidePassword() {
 
 // Validate Form
 function validateForm(formData) {
-    // Add the UPDATE value to the formdata
-    formData += `&update=${update ? 1 : 0}`;
     // Validate if the password is empty
     if (document.getElementById('password').value === '' && update) {
         // If the password is empty and it is an update, it is eliminated from the formdata
@@ -233,7 +228,7 @@ function validateForm(formData) {
     }
 
     $.ajax({
-        url: `validate_form`,
+        url: `validate_form/${update ? idEmployee : '-1'}`,
         method: 'POST',
         data: formData,
         success: function () {
@@ -263,13 +258,11 @@ function validateForm(formData) {
 function submitEmployee(event) {
     event.preventDefault();
     let formData = $('#form-employee-data').serialize();
-    let url = update ? 'update_employee' : 'store_employee';
+    let url = update ? 'update_employee/' + idEmployee : 'store_employee';
     let method = update ? 'PUT' : 'POST';
 
-    if (update) {
-        if (document.getElementById('password').value === '') {
-            formData = formData.replace(/&password=[^&]*/g, '');
-        }
+    if (update && document.getElementById('password').value === '') {
+        formData = formData.replace(/&password=[^&]*/g, '');
     }
 
     $.ajax({
@@ -279,9 +272,7 @@ function submitEmployee(event) {
         success: function (response) {
             if (response.success) {
                 hideModal();
-                alertPredefined("success", "Success!", response.message).then(() => {
-                    location.reload();
-                });
+                alertPredefined("success", "Success!", response.message).then(() => { location.reload() });
             } else {
                 console.error(response.message);
             }
@@ -317,9 +308,7 @@ function importEmployees(event) {
             hideModal();
             stopAnimation();
             if (response.success) {
-                alertPredefined("success", "Success!", response.message).then(() => {
-                    location.reload();
-                });
+                alertPredefined("success", "Success!", response.message).then(() => { location.reload() });
             } else {
                 alertPredefined("error", "Error!", response.message);
             }
@@ -356,9 +345,7 @@ function deleteEmployee(employeeId, userId) {
                 method: 'DELETE',
                 success: function (response) {
                     if (response.success) {
-                        alertPredefined("success", "Deleted!", "Your file has been deleted.").then(() => {
-                            location.reload();
-                        });
+                        alertPredefined("success", "Deleted!", "Your file has been deleted.").then(() => { location.reload() });
                     } else {
                         console.error(response.message);
                     }
@@ -390,11 +377,11 @@ function filterEmployees(url = `filter_employee`) {
                                     <td>${element.name}</td>
                                     <td>${element.last_name}</td>
                                     <td>${element.department.name}</td>
-                                    <td>${element.count_access}</td>
+                                    <td>${element.history_access_count}</td>
                                     <td class="btns">
                                         <button class="btn update" onclick="setFormEmployee(true, ${element.id})">Update</button>
                                         <button class="btn disable" onclick="toggleEmployeeStatus('${element.user_id}')" id="status-${element.user_id}">
-                                            ${ element.active ? "Enable" : "Disable" }
+                                            ${element.active ? "Disable" : "Enable"}
                                         </button>
                                         <button class="btn history" onclick="getHistoryEmployee(${element.id})">History</button>
                                         <button class="btn delete" onclick="deleteEmployee(${element.id}, ${element.user_id})">Delete</button>
@@ -414,7 +401,7 @@ function filterEmployees(url = `filter_employee`) {
                 console.error(response.message);
             }
         },
-        error : function (xhr) {
+        error: function (xhr) {
             console.error(xhr.message);
         }
     })

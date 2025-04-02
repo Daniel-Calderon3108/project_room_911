@@ -39,6 +39,14 @@ class Employee extends Model
     }
 
     /**
+     * Relationship with history access
+     * @return HasMany
+     */
+    public function historyAccess() {
+        return $this->hasMany(HistoryAccess::class);
+    }
+
+    /**
      * Define attributes for the model
      * 
      * @return array<int, string>

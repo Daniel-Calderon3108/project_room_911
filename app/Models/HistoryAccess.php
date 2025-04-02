@@ -20,4 +20,12 @@ class HistoryAccess extends Model
         'success',
         'reason'
     ];
+
+    /**
+     * Relationship with employee
+     * @return BelongsTo
+     */
+    public function employee() {
+        return $this->belongsTo(Employee::class);
+    }
 }
